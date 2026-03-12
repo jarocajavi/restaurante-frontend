@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
+import Navbar from '../components/Navbar'
 
 function RestaurantDetail() {
   const { id } = useParams()
@@ -45,6 +46,8 @@ function RestaurantDetail() {
 
   return (
     <div className="min-h-screen bg-amber-50 p-8">
+        <Navbar />
+<div className='p-8'>
       <button
         onClick={() => navigate('/')}
         className="mb-6 bg-amber-800 text-white px-4 py-2 rounded-lg hover:bg-amber-900 transition"
@@ -134,7 +137,7 @@ function RestaurantDetail() {
           </table>
         </div>
       </section>
-    </div>
+    </div></div>
   )
 }
 
