@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
+import Navbar from '../components/Navbar'
 
 function Home() {
   const [restaurants, setRestaurants] = useState([])
@@ -22,7 +23,9 @@ function Home() {
   )
 
   return (
-    <div className="min-h-screen bg-amber-50 p-8">
+    <div className="min-h-screen bg-amber-50">
+        <Navbar />
+        <div className="p-8">
       <h1 className="text-4xl font-bold text-center text-amber-900 mb-2">🍽️ Restaurantes</h1>
       <p className="text-center text-amber-700 mb-8">Elige un restaurante para ver sus detalles</p>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-5xl mx-auto">
@@ -36,6 +39,7 @@ function Home() {
             <p className="text-amber-600 mt-1">📍 {r.barrio}</p>
           </div>
         ))}
+      </div>
       </div>
     </div>
   )
