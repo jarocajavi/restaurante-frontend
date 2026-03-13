@@ -9,26 +9,55 @@ function RestaurantDetail() {
   const [dishes, setDishes] = useState([])
   const [orders, setOrders] = useState([])
   const [customers, setCustomers] = useState([])
+  const [categories, setCategories] = useState([]) // NUEVO: categorías
+  const [orderDishes, setOrderDishes] = useState({}) // NUEVO: platos por pedido
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [restRes, dishesRes, ordersRes, customersRes] = await Promise.all([
-          fetch('http://localhost:4000/restaurants'),
-          fetch('http://localhost:4000/dishes'),
-          fetch('http://localhost:4000/orders'),
-          fetch('http://localhost:4000/customers')
-        ])
+        // ==========================================
+        // FETCH PARALELO: obtenemos todos los datos a la vez
+        // ==========================================
+        const [restRes, dishesRes, ordersRes, customersRes, categoriesRes] =
+          await Promise.all([
+            fetch('http://localhost:4000/restaurants'),
+            fetch('http://localhost:4000/dishes'),
+            fetch('http://localhost:4000/orders'),
+            fetch('http://localhost:4000/customers'),
+            fetch('http://localhost:4000/categories'), // NUEVO
+          ])
         const restData = await restRes.json()
         const dishesData = await dishesRes.json()
         const ordersData = await ordersRes.json()
         const customersData = await customersRes.json()
+        const categoriesData = await categoriesRes.json()
 
-        setRestaurant(restData.find(r => r.restauranteID === parseInt(id)))
-        setDishes(dishesData.filter(d => d.restauranteID === parseInt(id)))
-        setOrders(ordersData.filter(o => o.restauranteID === parseInt(id)))
+        const filteredOrders = ordersData.filter(
+          (o) => o.restauranteID === parseInt(id),
+        )
+
+        // ==========================================
+        // FETCH DE PLATOS POR PEDIDO
+        // Para cada pedido del restaurante, pedimos sus platos
+        // ==========================================
+        const orderDishesData = {}
+        await Promise.all(
+          filteredOrders.map(async (o) => {
+            const res = await fetch(
+              `http://localhost:4000/order/${o.pedidoID}/dishes`,
+            )
+            const data = await res.json()
+            orderDishesData[o.pedidoID] = data
+          }),
+        )
+
+        setRestaurant(restData.find((r) => r.restauranteID === parseInt(id)))
+        setDishes(dishesData.filter((d) => d.restauranteID === parseInt(id)))
+        setOrders(filteredOrders)
         setCustomers(customersData)
+        setCategories(categoriesData)
+        setOrderDishes(orderDishesData)
         setLoading(false)
       } catch (error) {
         console.error('Error fetching data:', error)
@@ -38,106 +67,145 @@ function RestaurantDetail() {
     fetchData()
   }, [id])
 
-  if (loading) return (
-    <div className="min-h-screen flex items-center justify-center bg-amber-50">
-      <p className="text-2xl text-amber-800">Cargando datos...</p>
-    </div>
-  )
+  // ==========================================
+  // HELPER: obtiene el nombre de la categoría por ID
+  // ==========================================
+  const getCategoryName = (categoriaID) => {
+    const cat = categories.find((c) => c.categoriaID === categoriaID)
+    return cat ? cat.categoria : categoriaID
+  }
+
+  if (loading)
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-amber-50">
+        <p className="text-2xl text-amber-800">Cargando datos...</p>
+      </div>
+    )
 
   return (
-    <div className="min-h-screen bg-amber-50 p-8">
-        <Navbar />
-<div className='p-8'>
-      <button
-        onClick={() => navigate('/')}
-        className="mb-6 bg-amber-800 text-white px-4 py-2 rounded-lg hover:bg-amber-900 transition"
-      >
-        ← Volver
-      </button>
+    <div className="min-h-screen bg-amber-50">
+      <Navbar />
+      <div className="p-8">
+        <button
+          onClick={() => navigate('/')}
+          className="mb-6 bg-amber-800 text-white px-4 py-2 rounded-lg hover:bg-amber-900 transition"
+        >
+          ← Volver
+        </button>
 
-      <h1 className="text-4xl font-bold text-amber-900 mb-1">{restaurant?.restaurante}</h1>
-      <p className="text-amber-600 mb-8">📍 {restaurant?.barrio}</p>
+        <h1 className="text-4xl font-bold text-amber-900 mb-1">
+          {restaurant?.restaurante}
+        </h1>
+        <p className="text-amber-600 mb-8">📍 {restaurant?.barrio}</p>
 
-      {/* Platos */}
-      <section className="mb-10">
-        <h2 className="text-2xl font-bold text-amber-800 mb-4">🍴 Platos</h2>
-        <div className="overflow-x-auto rounded-2xl shadow">
-          <table className="w-full bg-white text-left">
-            <thead className="bg-amber-800 text-white">
-              <tr>
-                <th className="p-3">Nombre</th>
-                <th className="p-3">Precio</th>
-                <th className="p-3">Categoría</th>
-              </tr>
-            </thead>
-            <tbody>
-              {dishes.map((d, i) => (
-                <tr key={d.platoID} className={i % 2 === 0 ? 'bg-amber-50' : 'bg-white'}>
-                  <td className="p-3">{d.plato}</td>
-                  <td className="p-3">{d.precio} €</td>
-                  <td className="p-3">{d.categoriaID}</td>
+        {/* Platos */}
+        <section className="mb-10">
+          <h2 className="text-2xl font-bold text-amber-800 mb-4">🍴 Platos</h2>
+          <div className="overflow-x-auto rounded-2xl shadow">
+            <table className="w-full bg-white text-left">
+              <thead className="bg-amber-800 text-white">
+                <tr>
+                  <th className="p-3">Nombre</th>
+                  <th className="p-3">Precio</th>
+                  <th className="p-3">Categoría</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </section>
-
-      {/* Pedidos */}
-      <section className="mb-10">
-        <h2 className="text-2xl font-bold text-amber-800 mb-4">📋 Pedidos</h2>
-        <div className="overflow-x-auto rounded-2xl shadow">
-          <table className="w-full bg-white text-left">
-            <thead className="bg-amber-800 text-white">
-              <tr>
-                <th className="p-3">ID Pedido</th>
-                <th className="p-3">Cliente</th>
-                <th className="p-3">Fecha</th>
-              </tr>
-            </thead>
-            <tbody>
-              {orders.map((o, i) => {
-                const customer = customers.find(c => c.clienteID === o.clienteID)
-                return (
-                  <tr key={o.pedidoID} className={i % 2 === 0 ? 'bg-amber-50' : 'bg-white'}>
-                    <td className="p-3">#{o.pedidoID}</td>
-                    <td className="p-3">{customer ? customer.cliente : 'Desconocido'}</td>
-                    <td className="p-3">{o.fecha}</td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
-      </section>
-
-      {/* Clientes */}
-      <section className="mb-10">
-        <h2 className="text-2xl font-bold text-amber-800 mb-4">👥 Clientes</h2>
-        <div className="overflow-x-auto rounded-2xl shadow">
-          <table className="w-full bg-white text-left">
-            <thead className="bg-amber-800 text-white">
-              <tr>
-                <th className="p-3">Nombre</th>
-                <th className="p-3">Email</th>
-                <th className="p-3">Teléfono</th>
-              </tr>
-            </thead>
-            <tbody>
-              {customers
-                .filter(c => orders.some(o => o.clienteID === c.clienteID))
-                .map((c, i) => (
-                  <tr key={c.clienteID} className={i % 2 === 0 ? 'bg-amber-50' : 'bg-white'}>
-                    <td className="p-3">{c.cliente}</td>
-                    <td className="p-3">{c.email}</td>
-                    <td className="p-3">{c.telefono}</td>
+              </thead>
+              <tbody>
+                {dishes.map((d, i) => (
+                  <tr
+                    key={d.platoID}
+                    className={i % 2 === 0 ? 'bg-amber-50' : 'bg-white'}
+                  >
+                    <td className="p-3">{d.plato}</td>
+                    <td className="p-3">{d.precio} €</td>
+                    <td className="p-3">
+                      {getCategoryName(d.categoriaID)}
+                    </td>{' '}
+                    {/* MEJORADO */}
                   </tr>
                 ))}
-            </tbody>
-          </table>
-        </div>
-      </section>
-    </div></div>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        {/* Pedidos */}
+        <section className="mb-10">
+          <h2 className="text-2xl font-bold text-amber-800 mb-4">📋 Pedidos</h2>
+          <div className="overflow-x-auto rounded-2xl shadow">
+            <table className="w-full bg-white text-left">
+              <thead className="bg-amber-800 text-white">
+                <tr>
+                  <th className="p-3">ID Pedido</th>
+                  <th className="p-3">Cliente</th>
+                  <th className="p-3">Fecha</th>
+                  <th className="p-3">Platos del pedido</th> {/* NUEVO */}
+                </tr>
+              </thead>
+              <tbody>
+                {orders.map((o, i) => {
+                  const customer = customers.find(
+                    (c) => c.clienteID === o.clienteID,
+                  )
+                  const platosDelPedido = orderDishes[o.pedidoID] || []
+                  return (
+                    <tr
+                      key={o.pedidoID}
+                      className={i % 2 === 0 ? 'bg-amber-50' : 'bg-white'}
+                    >
+                      <td className="p-3">#{o.pedidoID}</td>
+                      <td className="p-3">
+                        {customer ? customer.cliente : 'Desconocido'}
+                      </td>
+                      <td className="p-3">{o.fecha}</td>
+                      <td className="p-3 text-sm text-amber-700">
+                        {' '}
+                        {/* NUEVO */}
+                        {platosDelPedido.map((p) => p.plato).join(', ')}
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        {/* Clientes */}
+        <section className="mb-10">
+          <h2 className="text-2xl font-bold text-amber-800 mb-4">
+            👥 Clientes
+          </h2>
+          <div className="overflow-x-auto rounded-2xl shadow">
+            <table className="w-full bg-white text-left">
+              <thead className="bg-amber-800 text-white">
+                <tr>
+                  <th className="p-3">Nombre</th>
+                  <th className="p-3">Email</th>
+                  <th className="p-3">Teléfono</th>
+                </tr>
+              </thead>
+              <tbody>
+                {customers
+                  .filter((c) =>
+                    orders.some((o) => o.clienteID === c.clienteID),
+                  )
+                  .map((c, i) => (
+                    <tr
+                      key={c.clienteID}
+                      className={i % 2 === 0 ? 'bg-amber-50' : 'bg-white'}
+                    >
+                      <td className="p-3">{c.cliente}</td>
+                      <td className="p-3">{c.email}</td>
+                      <td className="p-3">{c.telefono}</td>
+                    </tr>
+                  ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </div>
+    </div>
   )
 }
 
