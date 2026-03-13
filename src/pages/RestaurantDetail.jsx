@@ -21,11 +21,11 @@ function RestaurantDetail() {
         // ==========================================
         const [restRes, dishesRes, ordersRes, customersRes, categoriesRes] =
           await Promise.all([
-            fetch('http://localhost:4000/restaurants'),
-            fetch('http://localhost:4000/dishes'),
-            fetch('http://localhost:4000/orders'),
-            fetch('http://localhost:4000/customers'),
-            fetch('http://localhost:4000/categories'), // NUEVO
+            fetch(`${import.meta.env.VITE_API_URL}/restaurants`),
+            fetch(`${import.meta.env.VITE_API_URL}/dishes`),
+            fetch(`${import.meta.env.VITE_API_URL}/orders`),
+            fetch(`${import.meta.env.VITE_API_URL}/customers`),
+            fetch(`${import.meta.env.VITE_API_URL}/categories`), // NUEVO
           ])
         const restData = await restRes.json()
         const dishesData = await dishesRes.json()
@@ -44,8 +44,9 @@ function RestaurantDetail() {
         const orderDishesData = {}
         await Promise.all(
           filteredOrders.map(async (o) => {
+            // console.log(o.pedidoID)
             const res = await fetch(
-              `http://localhost:4000/order/${o.pedidoID}/dishes`,
+              `${import.meta.env.VITE_API_URL}/order/${o.pedidoID}/dishes`,
             )
             const data = await res.json()
             orderDishesData[o.pedidoID] = data
