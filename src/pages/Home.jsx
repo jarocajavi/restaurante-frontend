@@ -5,21 +5,31 @@ import Navbar from '../components/Navbar'
 function Home() {
   const [restaurants, setRestaurants] = useState([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
   const navigate = useNavigate()
 
   useEffect(() => {
     fetch(`${import.meta.env.VITE_API_URL}/restaurants`)
-      .then((res) => res.json())
-      .then((data) => {
-        setRestaurants(data)
-        setLoading(false)
+      .then((res) => {
+        if (!res.ok) throw new Error(`Error HTTP: ${res.status}`)
+        return res.json()
       })
+      .then((data) => setRestaurants(data))
+      .catch((err) => setError(err.message))
+      .finally(() => setLoading(false))
   }, [])
 
   if (loading)
     return (
       <div className="min-h-screen flex items-center justify-center bg-amber-50">
         <p className="text-2xl text-amber-800">Cargando restaurantes...</p>
+      </div>
+    )
+
+  if (error)
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-amber-50">
+        <p className="text-2xl text-red-600">⚠️ {error}</p>
       </div>
     )
 

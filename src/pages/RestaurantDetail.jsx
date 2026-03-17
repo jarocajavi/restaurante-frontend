@@ -9,9 +9,10 @@ function RestaurantDetail() {
   const [dishes, setDishes] = useState([])
   const [orders, setOrders] = useState([])
   const [customers, setCustomers] = useState([])
-  const [categories, setCategories] = useState([]) // NUEVO: categorías
-  const [orderDishes, setOrderDishes] = useState({}) // NUEVO: platos por pedido
+  const [categories, setCategories] = useState([])
+  const [orderDishes, setOrderDishes] = useState({})
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
 
   useEffect(() => {
     const fetchData = async () => {
@@ -25,8 +26,16 @@ function RestaurantDetail() {
             fetch(`${import.meta.env.VITE_API_URL}/dishes`),
             fetch(`${import.meta.env.VITE_API_URL}/orders`),
             fetch(`${import.meta.env.VITE_API_URL}/customers`),
-            fetch(`${import.meta.env.VITE_API_URL}/categories`), // NUEVO
+            fetch(`${import.meta.env.VITE_API_URL}/categories`),
           ])
+
+        // ✅ FIX: Validar res.ok en todas las respuestas
+        if (!restRes.ok) throw new Error(`Error restaurantes: ${restRes.status}`)
+        if (!dishesRes.ok) throw new Error(`Error platos: ${dishesRes.status}`)
+        if (!ordersRes.ok) throw new Error(`Error pedidos: ${ordersRes.status}`)
+        if (!customersRes.ok) throw new Error(`Error clientes: ${customersRes.status}`)
+        if (!categoriesRes.ok) throw new Error(`Error categorías: ${categoriesRes.status}`)
+
         const restData = await restRes.json()
         const dishesData = await dishesRes.json()
         const ordersData = await ordersRes.json()
@@ -38,20 +47,22 @@ function RestaurantDetail() {
         )
 
         // ==========================================
-        // FETCH DE PLATOS POR PEDIDO
-        // Para cada pedido del restaurante, pedimos sus platos
+        // ✅ FIX N+1: Una sola petición para todos los platos de pedidos
+        // En vez de un fetch por cada pedido, traemos todos y filtramos
         // ==========================================
-        const orderDishesData = {}
-        await Promise.all(
-          filteredOrders.map(async (o) => {
-            // console.log(o.pedidoID)
-            const res = await fetch(
-              `${import.meta.env.VITE_API_URL}/order/${o.pedidoID}/dishes`,
-            )
-            const data = await res.json()
-            orderDishesData[o.pedidoID] = data
-          }),
+        const allOrderDishesRes = await fetch(
+          `${import.meta.env.VITE_API_URL}/order-dishes`,
         )
+        if (!allOrderDishesRes.ok)
+          throw new Error(`Error platos de pedidos: ${allOrderDishesRes.status}`)
+        const allOrderDishesData = await allOrderDishesRes.json()
+
+        const orderDishesData = {}
+        filteredOrders.forEach((o) => {
+          orderDishesData[o.pedidoID] = allOrderDishesData.filter(
+            (d) => d.pedidoID === o.pedidoID,
+          )
+        })
 
         setRestaurant(restData.find((r) => r.restauranteID === parseInt(id)))
         setDishes(dishesData.filter((d) => d.restauranteID === parseInt(id)))
@@ -59,18 +70,17 @@ function RestaurantDetail() {
         setCustomers(customersData)
         setCategories(categoriesData)
         setOrderDishes(orderDishesData)
-        setLoading(false)
-      } catch (error) {
-        console.error('Error fetching data:', error)
+      } catch (err) {
+        // ✅ FIX: Mostrar error al usuario, no solo en consola
+        setError(err.message)
+      } finally {
+        // ✅ FIX: finally garantiza que loading siempre se desactiva
         setLoading(false)
       }
     }
     fetchData()
   }, [id])
 
-  // ==========================================
-  // HELPER: obtiene el nombre de la categoría por ID
-  // ==========================================
   const getCategoryName = (categoriaID) => {
     const cat = categories.find((c) => c.categoriaID === categoriaID)
     return cat ? cat.categoria : categoriaID
@@ -80,6 +90,13 @@ function RestaurantDetail() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-amber-50">
         <p className="text-2xl text-amber-800">Cargando datos...</p>
+      </div>
+    )
+
+  if (error)
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-amber-50">
+        <p className="text-2xl text-red-600">⚠️ {error}</p>
       </div>
     )
 
@@ -119,10 +136,7 @@ function RestaurantDetail() {
                   >
                     <td className="p-3">{d.plato}</td>
                     <td className="p-3">{d.precio} €</td>
-                    <td className="p-3">
-                      {getCategoryName(d.categoriaID)}
-                    </td>{' '}
-                    {/* MEJORADO */}
+                    <td className="p-3">{getCategoryName(d.categoriaID)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -140,7 +154,7 @@ function RestaurantDetail() {
                   <th className="p-3">ID Pedido</th>
                   <th className="p-3">Cliente</th>
                   <th className="p-3">Fecha</th>
-                  <th className="p-3">Platos del pedido</th> {/* NUEVO */}
+                  <th className="p-3">Platos del pedido</th>
                 </tr>
               </thead>
               <tbody>
@@ -160,8 +174,6 @@ function RestaurantDetail() {
                       </td>
                       <td className="p-3">{o.fecha}</td>
                       <td className="p-3 text-sm text-amber-700">
-                        {' '}
-                        {/* NUEVO */}
                         {platosDelPedido.map((p) => p.plato).join(', ')}
                       </td>
                     </tr>
